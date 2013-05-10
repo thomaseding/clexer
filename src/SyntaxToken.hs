@@ -1,11 +1,16 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module SyntaxToken (
       Identifier
     , Code
     , SyntaxToken(..)
     , Punctuation
     , punc
+    , unpunc
+    , puncs
     , Keyword
     , kw
+    , keywords
     ) where
 
 
@@ -34,12 +39,24 @@ punc :: String -> Punctuation
 punc = Punc
 
 
+unpunc :: Punctuation -> String
+unpunc (Punc s) = s
+
+
+puncs :: [Punctuation]
+puncs = map punc $ words "~ ! % ^ & * ( ) - + = ? / . , ; : [ ] { } | < > << >> ++ -- == ~= != %= ^= &= *= <= >= :: -> && ||"
+
+
 newtype Keyword = Kw String
     deriving (Show, Eq, Ord)
 
 
 kw :: String -> Keyword
 kw = Kw
+
+
+keywords :: [Keyword]
+keywords = map kw $ words "if"
 
 
 

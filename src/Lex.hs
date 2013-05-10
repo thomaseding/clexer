@@ -4,18 +4,38 @@ module Lex (
 
 import Data.Char
 import Data.List
+import Data.Monoid
+import Data.Ratio
+import Data.Set (Set)
+import qualified Data.Set as S
 import Data.Tuple.Curry
 import Numeric
 import SyntaxToken
-import Text.Parsec
+import Text.Parsec hiding (newline)
 import Text.Parsec.String
 
 
 type Lexer = Parser
 
 
-test :: Lexer a -> String -> Either ParseError a
-test p = runParser p () ""
+runLexer :: String -> Either ParseError [SyntaxToken]
+runLexer = runParser lexC () ""
+
+
+lexC :: Lexer [SyntaxToken]
+lexC = do
+    many space
+    toks <- many (lexSyntaxToken >>= \ts -> many space >> return ts)
+    eof
+    return toks
+
+
+newline :: Lexer ()
+newline = do
+    c <- oneOf "\r\n"
+    case c of 
+        '\r' -> optional $ char '\n'
+        '\n' -> optional $ char '\r'
 
 
 lexSyntaxToken :: Lexer SyntaxToken
@@ -35,23 +55,83 @@ lexSyntaxToken = parserZero
 
 
 lexInclude :: Lexer FilePath
-lexInclude = parserZero
+lexInclude = do
+    char '#'
+    many space
+    string "include"
+    many1 space
+    lexString <|> lexBracketString
 
 
-lexDefine :: Lexer (Identifier, (Maybe [Identifier]), Code)
-lexDefine = parserZero
+lexDefine :: Lexer (Identifier, Maybe [Identifier], Code)
+lexDefine = do
+    char '#'
+    many space
+    string "define"
+    many1 space
+    name <- lexIdentifier
+    mArgs <- optionMaybe $ do
+        char '('
+        args <- (many space >> lexIdentifier >>= \i -> many space >> return i) `sepBy` char ','
+        char ')'
+        return args
+    many space
+    code <- many $ noneOf "\n\r"
+    return (name, mArgs, code)
 
 
 lexPunctuation :: Lexer Punctuation
-lexPunctuation = parserZero
+lexPunctuation = do
+    cs <- lookAhead $ many1 $ oneOf punctuationChars
+    let possiblePuncs = reverse $ inits cs
+        mPunc = mconcat $ flip map possiblePuncs $ \possPunc -> if punc possPunc `S.member` punctuationSet
+            then First $ Just possPunc
+            else First Nothing
+    case getFirst mPunc of
+        Nothing -> parserZero
+        Just p -> string p >> return (punc p)
+    
+
+punctuationChars :: [Char]
+punctuationChars = nub $ concat $ map unpunc puncs
+
+
+punctuationSet :: Set Punctuation
+punctuationSet = S.fromList puncs
 
 
 lexKeyword :: Lexer Keyword
-lexKeyword = parserZero
+lexKeyword = do
+    ident <- lookAhead lexIdentifier
+    if kw ident `S.member` keywordSet
+        then string ident >> return (kw ident)
+        else parserZero
+
+
+keywordSet :: Set Keyword
+keywordSet = S.fromList keywords
+
+
+wholeWord :: Lexer a -> Lexer a
+wholeWord p = do
+    res <- p
+    notFollowedBy $ alphaNum <|> char '_'
+    return res
 
 
 lexFloating :: Lexer Rational
-lexFloating = parserZero
+lexFloating = do
+    sign <- flip fmap (optionMaybe $ char '-') $ maybe id $ const negate
+    beforeDecimal <- lexBase 10
+    char '.'
+    afterDecimal <- lexBase 10
+    optional $ oneOf "fF"
+    let afterDecimalDigits = case reverse $ dropWhile (== '0') $ reverse $ show afterDecimal of
+            "" -> "0"
+            ds -> ds
+        numer = read $ show beforeDecimal ++ afterDecimalDigits
+        denom = 10 * genericLength afterDecimalDigits
+    return $ sign $ numer % denom
 
 
 lexInteger :: Lexer Integer
@@ -67,20 +147,21 @@ lexInteger = do
                     'x' -> anyChar >> lexBase 16
                     _ -> lexBase 8
         _ -> lexBase 10
+    many $ oneOf "uUlL"
     return $ sign num
 
 
 lexIdentifier :: Lexer Identifier
 lexIdentifier = do
     first <- letter <|> char '_'
-    rest <- many1 $ alphaNum <|> char '_'
+    rest <- many $ alphaNum <|> char '_'
     return $ first : rest
 
 
-lexRawChar :: Lexer Char
-lexRawChar = lexEscapedChar <|> satisfy simple
+lexRawChar :: [Char] -> Lexer Char
+lexRawChar extraSpecials = lexEscapedChar <|> satisfy simple
     where
-        special = (`elem` "\\\"'")
+        special = flip elem $ '\\' : extraSpecials
         simple c = ' ' <= c && c <= '~' && not (special c)
 
 
@@ -147,7 +228,7 @@ lexBase base = do
 lexString :: Lexer String
 lexString = do
     char '"'
-    str <- many (lexRawChar <|> char '\'')
+    str <- many $ lexRawChar "\""
     char '"'
     return str
 
@@ -155,12 +236,17 @@ lexString = do
 lexChar :: Lexer Char
 lexChar = do
     char '\''
-    c <- lexRawChar <|> char '"'
+    c <- lexRawChar "'"
     char '\''
     return c
 
 
-
+lexBracketString :: Lexer String
+lexBracketString = do
+    char '<'
+    str <- many $ lexRawChar ">"
+    char '>'
+    return str
 
 
 
