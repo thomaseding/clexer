@@ -1,4 +1,5 @@
 module Lex (
+      runLexer
     ) where
 
 
@@ -227,6 +228,12 @@ lexBase base = do
 
 lexString :: Lexer String
 lexString = do
+    parts <- many1 (lexString' >>= \s -> many space >> return s)
+    return $ concat parts
+
+
+lexString' :: Lexer String
+lexString' = do
     char '"'
     str <- many $ lexRawChar "\""
     char '"'
