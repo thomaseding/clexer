@@ -41,18 +41,47 @@ newline = do
 
 lexSyntaxToken :: Lexer SyntaxToken
 lexSyntaxToken = parserZero
+    <|> lexComment --> const Comment
     <|> lexString --> String
     <|> lexChar --> Char
+    <|> try lexFloating --> Floating
     <|> lexInteger --> Integer
-    <|> lexFloating --> Floating
-    <|> lexIdentifier --> Identifier
     <|> lexInclude --> Include
     <|> lexDefine --> uncurry3 Define
     <|> lexPunctuation --> Punctuation
     <|> lexKeyword --> Keyword
+    <|> lexIdentifier --> Identifier
     where
         infix 2 -->
         p --> f = fmap f p
+
+
+lexComment :: Lexer ()
+lexComment = lexLineComment <|> lexBlockComment
+
+
+lexLineComment :: Lexer ()
+lexLineComment = do
+    try $ string "//"
+    many $ noneOf "\r\n"
+    return ()
+
+
+lexBlockComment :: Lexer ()
+lexBlockComment = do
+    try $ string "/*"
+    many nonClosing
+    string "*/"
+    return ()
+    where
+        nonClosing = do
+            future <- lookAhead $ do
+                c1 <- anyChar
+                c2 <- anyChar
+                return [c1, c2]
+            if future == "*/"
+                then parserZero
+                else anyChar
 
 
 lexInclude :: Lexer FilePath

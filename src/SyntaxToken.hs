@@ -28,6 +28,7 @@ data SyntaxToken
     | Define Identifier (Maybe [Identifier]) Code
     | Punctuation Punctuation
     | Keyword Keyword
+    | Comment
     deriving (Show, Eq, Ord)
 
 
