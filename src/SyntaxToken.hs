@@ -4,14 +4,21 @@ module SyntaxToken (
       Identifier
     , Code
     , SyntaxToken(..)
+    , Directive(..)
     , Punctuation
     , punc
     , unpunc
     , puncs
     , Keyword
     , kw
+    , unkw
     , keywords
     ) where
+
+
+import Data.Char
+import Data.List
+import Numeric
 
 
 type Identifier = String
@@ -24,11 +31,20 @@ data SyntaxToken
     | Integer Integer
     | Floating Rational
     | Identifier Identifier
-    | Include FilePath
-    | Define Identifier (Maybe [Identifier]) Code
+    | Directive Directive
     | Punctuation Punctuation
     | Keyword Keyword
     | Comment
+    deriving (Show, Eq, Ord)
+
+
+data Directive
+    = Include FilePath
+    | Define Identifier (Maybe [Identifier]) Code
+    | If Code
+    | Ifdef Code
+    | Ifndef Code
+    | Endif
     deriving (Show, Eq, Ord)
 
 
@@ -45,7 +61,17 @@ unpunc (Punc s) = s
 
 
 puncs :: [Punctuation]
-puncs = map punc $ words "~ ! % ^ & * ( ) - + = ? / . , ; : [ ] { } | < > << >> ++ -- == ~= != %= ^= &= *= <= >= :: -> && ||"
+puncs = map punc $ [
+  "{", "}", "[", "]", "(", ")", "<", ">", "<=", ">=",
+  "+", "-", "*", "/", "~", "!", "%", "^", "&", "|",
+  "<<", ">>", "++", "--",
+  "&&", "||", "==", "!=",
+  ".", "->", ".*", "->*",
+  "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=",
+  "?", ":", ",", ";", "::",
+  "#", "##",
+  "\\"
+  ]
 
 
 newtype Keyword = Kw String
@@ -54,6 +80,10 @@ newtype Keyword = Kw String
 
 kw :: String -> Keyword
 kw = Kw
+
+
+unkw :: Keyword -> String
+unkw (Kw s) = s
 
 
 keywords :: [Keyword]

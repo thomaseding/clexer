@@ -1,5 +1,6 @@
 module Lex (
-      runLexer
+      main
+    , runLexer
     ) where
 
 
@@ -11,12 +12,21 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Tuple.Curry
 import Numeric
+import Pretty
 import SyntaxToken
 import Text.Parsec hiding (newline)
 import Text.Parsec.String
 
 
 type Lexer = Parser
+
+
+main :: IO ()
+main = do
+    str <- getContents
+    case runLexer str of
+        Left err -> print err
+        Right toks -> putStrLn $ pretty toks
 
 
 runLexer :: String -> Either ParseError [SyntaxToken]
@@ -46,8 +56,7 @@ lexSyntaxToken = parserZero
     <|> lexChar --> Char
     <|> try lexFloating --> Floating
     <|> lexInteger --> Integer
-    <|> lexInclude --> Include
-    <|> lexDefine --> uncurry3 Define
+    <|> lexDirective
     <|> lexPunctuation --> Punctuation
     <|> lexKeyword --> Keyword
     <|> lexIdentifier --> Identifier
@@ -84,20 +93,71 @@ lexBlockComment = do
                 else anyChar
 
 
-lexInclude :: Lexer FilePath
+line :: Lexer String
+line = many $ noneOf "\r\n"
+
+
+wholeWord :: String -> Lexer String
+wholeWord str = do
+    string str
+    notFollowedBy $ alphaNum <|> char '_'
+    return str
+
+
+lexDirective :: Lexer SyntaxToken
+lexDirective = do
+    char '#'
+    many space
+    res <- lexInclude
+        <|> lexDefine
+        <|> lexIf
+        <|> lexIfdef
+        <|> lexIfndef
+        <|> lexEndif
+    return $ Directive res
+
+
+lexIf :: Lexer Directive
+lexIf = do
+    try $ wholeWord "if"
+    many space
+    code <- line
+    return $ If code
+
+
+lexIfdef :: Lexer Directive
+lexIfdef = do
+    try $ wholeWord "ifdef"
+    many space
+    code <- line
+    return $ Ifdef code
+
+
+lexIfndef :: Lexer Directive
+lexIfndef = do
+    try $ wholeWord "ifndef"
+    many space
+    code <- line
+    return $ Ifndef code
+
+
+lexEndif :: Lexer Directive
+lexEndif = do
+    try $ wholeWord "endif"
+    return Endif
+
+
+lexInclude :: Lexer Directive
 lexInclude = do
-    char '#'
-    many space
-    string "include"
+    try $ wholeWord "include"
     many1 space
-    lexString <|> lexBracketString
+    path <- lexString <|> lexBracketString
+    return $ Include path
 
 
-lexDefine :: Lexer (Identifier, Maybe [Identifier], Code)
+lexDefine :: Lexer Directive
 lexDefine = do
-    char '#'
-    many space
-    string "define"
+    try $ wholeWord "define"
     many1 space
     name <- lexIdentifier
     mArgs <- optionMaybe $ do
@@ -106,8 +166,8 @@ lexDefine = do
         char ')'
         return args
     many space
-    code <- many $ noneOf "\n\r"
-    return (name, mArgs, code)
+    code <- line
+    return $ Define name mArgs code
 
 
 lexPunctuation :: Lexer Punctuation
@@ -142,16 +202,8 @@ keywordSet :: Set Keyword
 keywordSet = S.fromList keywords
 
 
-wholeWord :: Lexer a -> Lexer a
-wholeWord p = do
-    res <- p
-    notFollowedBy $ alphaNum <|> char '_'
-    return res
-
-
 lexFloating :: Lexer Rational
 lexFloating = do
-    sign <- flip fmap (optionMaybe $ char '-') $ maybe id $ const negate
     beforeDecimal <- lexBase 10
     char '.'
     afterDecimal <- lexBase 10
@@ -161,24 +213,21 @@ lexFloating = do
             ds -> ds
         numer = read $ show beforeDecimal ++ afterDecimalDigits
         denom = 10 * genericLength afterDecimalDigits
-    return $ sign $ numer % denom
+    return $ numer % denom
 
 
 lexInteger :: Lexer Integer
 lexInteger = do
-    sign <- flip fmap (optionMaybe $ char '-') $ maybe id $ const negate
     next <- lookAhead anyChar
     num <- case next of
         '0' -> do
-            anyChar
-            (eof >> return 0) <|> do
-                next' <- lookAhead anyChar
-                case next' of
-                    'x' -> anyChar >> lexBase 16
-                    _ -> lexBase 8
+            next' <- lookAhead $ anyChar >> anyChar
+            case next' of
+                'x' -> anyChar >> anyChar >> lexBase 16
+                _ -> lexBase 8
         _ -> lexBase 10
     many $ oneOf "uUlL"
-    return $ sign num
+    return num
 
 
 lexIdentifier :: Lexer Identifier
