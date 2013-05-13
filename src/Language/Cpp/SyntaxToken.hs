@@ -39,6 +39,20 @@ data SyntaxToken a
     deriving (Show, Eq, Ord)
 
 
+instance Functor SyntaxToken where
+    fmap func tok = case tok of
+        String s -> String s
+        Char c -> Char c
+        Integer n -> Integer n
+        Floating f -> Floating f
+        Identifier i -> Identifier i
+        Directive d -> Directive d
+        Punctuation p -> Punctuation p
+        Keyword k -> Keyword k
+        Comment -> Comment
+        Ext x -> Ext (func x)
+
+
 data Directive
     = Include FilePath
     | Define Identifier (Maybe [Identifier]) Code

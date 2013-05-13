@@ -3,6 +3,7 @@
 
 module Language.Cpp.Pretty (
       pretty
+    , ignoreExt
     ) where
 
 
@@ -75,13 +76,26 @@ bestSpace :: Char -> Char -> Char
 bestSpace c = snd . on min (\c -> (prioritizeSpace c, c)) c
 
 
-pretty :: [SyntaxToken ()] -> String
-pretty = unlines . filter (not . all isSpace) . lines . tabify . dropWhile isSpace . flip evalState st . execWriterT . mapM_ prettyToken . filter (/= Comment)
+ignoreExt :: a -> [SyntaxToken ()]
+ignoreExt _ = []
+
+
+pretty :: (a -> [SyntaxToken ()]) -> [SyntaxToken a] -> String
+pretty f = unlines . filter (not . all isSpace) . lines
+    . tabify
+    . dropWhile isSpace
+    . flip evalState st . execWriterT
+    . mapM_ prettyToken
+    . filter (`notElem` [Comment, Ext ()])
+    . concatMap f'
     where
         st = St {
               prev = Comment
             , spaceAtEnd = Just ' '
             }
+        f' tok = case tok of
+            Ext x -> f x
+            _ -> [fmap (const ()) tok]
 
 
 prettyToken :: SyntaxToken () -> Pretty ()

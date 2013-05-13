@@ -26,14 +26,14 @@ main = do
     str <- getContents
     case runLexer str of
         Left err -> print err
-        Right toks -> putStrLn $ pretty toks
+        Right toks -> putStrLn $ pretty (ignoreExt :: () -> [SyntaxToken ()]) toks
 
 
-runLexer :: String -> Either ParseError [SyntaxToken ()]
+runLexer :: (Eq a) => String -> Either ParseError [SyntaxToken a]
 runLexer = runParser lexC () ""
 
 
-lexC :: Lexer [SyntaxToken ()]
+lexC :: (Eq a) => Lexer [SyntaxToken a]
 lexC = do
     many space
     toks <- many (lexSyntaxToken >>= \ts -> many space >> return ts)
@@ -41,7 +41,7 @@ lexC = do
     return $ negateNumbers toks
 
 
-negateNumbers :: [SyntaxToken ()] -> [SyntaxToken ()]
+negateNumbers :: (Eq a) => [SyntaxToken a] -> [SyntaxToken a]
 negateNumbers tokens = case tokens of
     t1 : t2 : t3 : ts -> let
         continue = t1 : (negateNumbers $ t2 : t3 : ts)
@@ -65,7 +65,7 @@ negateNumbers tokens = case tokens of
     [] -> []
 
 
-negateNumber :: SyntaxToken () -> Maybe (SyntaxToken ())
+negateNumber :: SyntaxToken a -> Maybe (SyntaxToken a)
 negateNumber t = case t of
     Integer n -> Just $ Integer $ negate n
     Floating x -> Just $ Floating $ negate x
@@ -80,7 +80,7 @@ newline = do
         '\n' -> optional $ char '\r'
 
 
-lexSyntaxToken :: Lexer (SyntaxToken ())
+lexSyntaxToken :: Lexer (SyntaxToken a)
 lexSyntaxToken = parserZero
     <|> lexComment --> const Comment
     <|> lexString --> String
@@ -135,7 +135,7 @@ wholeWord str = do
     return str
 
 
-lexDirective :: Lexer (SyntaxToken ())
+lexDirective :: Lexer (SyntaxToken a)
 lexDirective = do
     char '#'
     many space
