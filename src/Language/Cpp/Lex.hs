@@ -1,6 +1,7 @@
 module Language.Cpp.Lex (
       main
     , runLexer
+    , ParseError
     ) where
 
 
