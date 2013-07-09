@@ -11,7 +11,6 @@ import Data.Monoid
 import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as S
-import Data.Tuple.Curry
 import Language.Cpp.Pretty
 import Language.Cpp.SyntaxToken
 import Numeric
