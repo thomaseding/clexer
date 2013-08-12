@@ -234,6 +234,7 @@ keywordSet :: Set Keyword
 keywordSet = S.fromList keywords
 
 
+-- TODO: This function needs to properly parse 1e3 and 1e-3 (Note: There are no decimal points here.)
 lexFloating :: Lexer Rational
 lexFloating = do
     beforeDecimal <- lexBase 10
