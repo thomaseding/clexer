@@ -5,9 +5,6 @@ module Language.Cpp.Lex (
     ) where
 
 
-import Debug.Trace
-
-
 import Data.Char
 import Data.List
 import Data.Monoid
@@ -247,8 +244,6 @@ lexFloating = do
             ds -> ds
         numer = read $ show beforeDecimal ++ afterDecimalDigits
         denom = 10 ^ genericLength afterDecimalDigits
-    traceShow (beforeDecimal, afterDecimal) $ return ()
-    traceShow (numer, denom) $ return ()
     return $ numer % denom
 
 
