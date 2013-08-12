@@ -5,6 +5,7 @@ module Language.Cpp.Lex (
     ) where
 
 
+import Control.Exception (assert)
 import Data.Char
 import Data.List
 import Data.Monoid
@@ -238,13 +239,22 @@ lexFloating = do
     beforeDecimal <- lexBase 10
     char '.'
     afterDecimal <- lexBase 10
+    exponent <- option 0 $ do
+        oneOf "eE"
+        signFunc <- option id $ do
+            c <- oneOf "-+"
+            return $ case c of
+                '-' -> negate
+                '+' -> id
+                _ -> assert False undefined
+        fmap signFunc $ lexBase 10
     optional $ oneOf "fF"
     let afterDecimalDigits = case reverse $ dropWhile (== '0') $ reverse $ show afterDecimal of
             "" -> "0"
             ds -> ds
         numer = read $ show beforeDecimal ++ afterDecimalDigits
         denom = 10 ^ genericLength afterDecimalDigits
-    return $ numer % denom
+    return $ (numer % denom) * (10 ^^ exponent)
 
 
 lexInteger :: Lexer Integer
