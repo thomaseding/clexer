@@ -1,5 +1,5 @@
-{-# Language FlexibleInstances #-}
-{-# Language TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Language.Cpp.Pretty (
       pretty
